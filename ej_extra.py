@@ -82,9 +82,10 @@ def get_sample_points_ok_and_errors(v, sp_0, sp_1):
     return sp_0_read_0, sp_0_read_1, sp_1_read_1, sp_1_read_0
 
 def get_signal_power(v, t):
-    energy = np.sum(np.abs(v)**2)
-    delta_t = t[-1]-t[0]
-    power = energy/delta_t
+    delta_t = t[1]-t[0]
+    energy = np.sum(np.abs(v)**2)*delta_t
+    tspan = t[-1]-t[0]
+    power = energy/tspan
     return power
 
 def plot_signal(v, t, sp_0_read_0, sp_0_read_1, sp_1_read_1, sp_1_read_0, bits, dz_start, dz_end, filename=None):
