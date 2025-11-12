@@ -29,7 +29,7 @@ def get_dead_zone_range(time: np.ndarray, v: np.ndarray, dead_zone_min_length: f
             return i, j
     return np.nan, np.nan
 
-def get_bit_and_error_count(t, v, mbps, bits, threshold=None):
+def get_bit_and_error_count(t, v, mbps, bits, threshold=None, plot=True):
     def get_bit_and_error_count_onesided(v, bits, threshold, dz_end, step):
         sample_points = [dz_end + int((0.5+i)*step) for i, _ in enumerate(bits)]
 
@@ -60,30 +60,30 @@ def get_bit_and_error_count(t, v, mbps, bits, threshold=None):
     sample_points = np.concatenate((sample_points,sample_points_before))
     error_sample_points = np.concatenate((error_sample_points, error_sample_points_before))
 
-    plt.figure()
+    if plot:
+        plt.figure()
+        # plots real bits:
+        for i, b in enumerate(bits_after_dz[:-1]):
+            if b:
+                start_t = t[dz_end + int((i)*step)]
+                end_t = t[dz_end + int((i+1)*step)]
+                plt.axvspan(start_t, end_t, color='#e0e0e0')
+        for i, b in enumerate(bits_before_dz[:-1]):
+            if b:
+                start_t = t[dz_start - int((i)*step)]
+                end_t = t[dz_start - int((i+1)*step)]
+                plt.axvspan(start_t, end_t, color='#e0e0e0')
 
-    # plots real bits:
-    for i, b in enumerate(bits_after_dz[:-1]):
-        if b:
-            start_t = t[dz_end + int((i)*step)]
-            end_t = t[dz_end + int((i+1)*step)]
-            plt.axvspan(start_t, end_t, color='#e0e0e0')
-    for i, b in enumerate(bits_before_dz[:-1]):
-        if b:
-            start_t = t[dz_start - int((i)*step)]
-            end_t = t[dz_start - int((i+1)*step)]
-            plt.axvspan(start_t, end_t, color='#e0e0e0')
+        # plot measured signal
+        plt.plot(t, v, color='#aaaadd', linewidth=0.7, zorder=99)
 
-    # plot measured signal
-    plt.plot(t, v, color='#aaaadd', linewidth=0.7, zorder=99)
+        # plot decision threshold
+        plt.axhline(threshold, color='k', alpha=0.7, linewidth=0.7, label="Decision threshold")
 
-    # plot decision threshold
-    plt.axhline(threshold, color='k', alpha=0.7, linewidth=0.7, label="Decision threshold")
-
-    # plot sample points
-    plt.scatter(t[sample_points], v[sample_points], color='b', label="Decision samples", zorder=100)
-    # plot erroneous sample points
-    plt.scatter(t[error_sample_points], v[error_sample_points], color='r', label="Bit errors", zorder=101)
+        # plot sample points
+        plt.scatter(t[sample_points], v[sample_points], color='b', label="Decision samples", zorder=100)
+        # plot erroneous sample points
+        plt.scatter(t[error_sample_points], v[error_sample_points], color='r', label="Bit errors", zorder=101)
 
     return len(error_sample_points), len(bits_after_dz) + len(bits_before_dz)
 
