@@ -30,28 +30,48 @@ def get_dead_zone_range(time: np.ndarray, v: np.ndarray, dead_zone_min_length: f
     return np.nan, np.nan
 
 def get_bit_and_error_count(t, v, mbps, bits, threshold=None):
+    def get_bit_and_error_count_onesided(v, bits, threshold, dz_end, step):
+        sample_points = [dz_end + int((0.5+i)*step) for i, _ in enumerate(bits)]
+
+        # despues de la zona muerta
+        error_sample_points = [sample_point for meas, sample_point, bit in zip(v[sample_points], sample_points, bits) if not bit == int(meas > threshold)]
+        return np.array(sample_points, dtype=np.int64), np.array(error_sample_points, dtype=np.int64)
+    
     if threshold == None:
         threshold = (np.min(v)+ np.max(v))/2
 
     #skip first and last 0 bits which cannot be distinguished from dead zone:
     bits = np.trim_zeros(bits, trim='fb')
+    dz_start, dz_end = get_dead_zone_range(t, v)
 
-    _, dz_end = get_dead_zone_range(t, v)
-
-    T = t[1]-t[0]
+    T = np.abs(t[1]-t[0])
     step = 1/(1e6*mbps*T)
-    bits_in_sample = int((len(v) - dz_end) / step)
-    bits = bits[:bits_in_sample]
-    sample_points = [dz_end + int((0.5+i)*step) for i, _ in enumerate(bits)]
+    bits_in_sample_after = int((len(v) - dz_end) / step)
+    bits_after_dz = bits[:bits_in_sample_after]
+    bits_in_sample_before = int(dz_start / step)
+    bits_before_dz = bits[:-bits_in_sample_before:-1]
 
-    # despues de la zona muerta
-    error_times = [time for time, meas, bit in zip(t[sample_points], v[sample_points], bits) if bit != int(meas > threshold)]
-    
+    sample_points, error_sample_points = get_bit_and_error_count_onesided(v, bits_after_dz, threshold, dz_end, step)
+    sample_points_before, error_sample_points_before = get_bit_and_error_count_onesided(v[::-1], bits_before_dz, threshold, len(t)-dz_start, step)
+
+    sample_points_before = -sample_points_before + len(v)
+    error_sample_points_before = -error_sample_points_before + len(v)
+
+    sample_points = np.concatenate((sample_points,sample_points_before))
+    error_sample_points = np.concatenate((error_sample_points, error_sample_points_before))
+
+    plt.figure()
+
     # plots real bits:
-    for i, b in enumerate(bits[:-1]):
+    for i, b in enumerate(bits_after_dz[:-1]):
         if b:
             start_t = t[dz_end + int((i)*step)]
             end_t = t[dz_end + int((i+1)*step)]
+            plt.axvspan(start_t, end_t, color='#e0e0e0')
+    for i, b in enumerate(bits_before_dz[:-1]):
+        if b:
+            start_t = t[dz_start - int((i)*step)]
+            end_t = t[dz_start - int((i+1)*step)]
             plt.axvspan(start_t, end_t, color='#e0e0e0')
 
     # plot measured signal
@@ -62,12 +82,10 @@ def get_bit_and_error_count(t, v, mbps, bits, threshold=None):
 
     # plot sample points
     plt.scatter(t[sample_points], v[sample_points], color='b', label="Decision samples", zorder=100)
+    # plot erroneous sample points
+    plt.scatter(t[error_sample_points], v[error_sample_points], color='r', label="Bit errors", zorder=101)
 
-    # plot erronous sample points
-    for error_time in error_times:
-        plt.scatter(error_time, color='r', alpha=1, zorder=101)
-
-    return len(error_times)
+    return len(error_sample_points)
 
 
 if __name__ == '__main__':
