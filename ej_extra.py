@@ -31,9 +31,50 @@ def get_dead_zone_range(time: np.ndarray, v: np.ndarray, dead_zone_min_length: f
             return i, j
     return np.nan, np.nan
 
+def get_sample_points(v, t, mbps, bits):
+    bits = np.trim_zeros(bits, trim='fb')
+    dz_start, dz_end = get_dead_zone_range(t, v)
+
+    T = np.abs(t[1]-t[0])
+    step = 1/(1e6*mbps*T)
+    bits_in_sample_before = int(dz_start / step)
+    bits_before_dz = bits[:-bits_in_sample_before:-1]
+        
+    sp_0_before = np.array([dz_start - int((0.5+i)*step) for i, bit in enumerate(bits_before_dz) if not bit])
+    sp_1_before = np.array([dz_start - int((0.5+i)*step) for i, bit in enumerate(bits_before_dz) if bit])
+
+    bits_in_sample_after = int((len(v) - dz_end) / step)
+    bits_after_dz = bits[:bits_in_sample_after]
+    sp_0_after = np.array([dz_end + int((0.5+i)*step) for i, bit in enumerate(bits_after_dz) if not bit])
+    sp_1_after = np.array([dz_end + int((0.5+i)*step) for i, bit in enumerate(bits_after_dz) if bit])
+
+    sp_0 = np.concatenate((sp_0_before, sp_0_after))
+    sp_1 = np.concatenate((sp_1_before, sp_1_after))
+
+    return sp_0, sp_1
+
+def calc_ber_and_Q(v, sp_0, sp_1, threshold):
+    v_0 = v[sp_0]
+    v_1 = v[sp_1]
+
+    sp_0_read_ok = [sp for sp, v in zip(sp_0, v_0) if v < threshold]
+    sp_0_read_error = [sp for sp, v in zip(sp_0, v_0) if v >= threshold]    # read 1 when it was a 0
+    sp_1_read_ok = [sp for sp, v in zip(sp_1, v_1) if v >= threshold]
+    sp_1_read_error = [sp for sp, v in zip(sp_1, v_1) if v < threshold]     # read 0 when it was a 1
+
+    mu_0, mu_1 = np.mean(v_0), np.mean(v_1)
+    std_0, std_1 = np.std(v_0), np.std(v_1)
+    print(f"mu: {mu_0} - {mu_1}")
+    print(f"std: {std_0} - {std_1}")
+
+    ber = (len(sp_0_read_error)+ len(sp_1_read_error))/ (len(sp_0) + len(sp_1))
+    print(f"ber: {ber}")
+
+    return 
+
+
 def get_bit_and_error_count(t, v, mbps, bits, threshold=None, plot=True, params={}, figfilename=""):
     def get_bit_and_error_count_onesided(v, bits, threshold, dz_end, step):
-        sample_points = [dz_end + int((0.5+i)*step) for i, _ in enumerate(bits)]
         sample_points = [dz_end + int((0.5+i)*step) for i, _ in enumerate(bits)]
 
         # despues de la zona muerta
@@ -140,4 +181,13 @@ if __name__ == '__main__':
         params = {"Filename": file}
         error_count, bit_count = get_bit_and_error_count(t, v, mbps, bits, plot=True, params=params, figfilename=file)
         print(f"BER: {error_count}/{bit_count} = {error_count/bit_count}")
+        
+        ##### debug:
+        sp_0, sp_1 = get_sample_points(v, t, mbps, bits)
+        plt.scatter(t[sp_0], np.zeros_like(sp_0)+2.0, marker='x', color='k', zorder=200)
+        plt.scatter(t[sp_1], np.zeros_like(sp_1)+2.0, marker='x', color='b', zorder=200)
+        threshold = (np.max(v)+np.min(v))/2.0
+        print(f"threshold: {threshold}")
+        calc_ber_and_Q(v, sp_0, sp_1, threshold)
+
     plt.show()
