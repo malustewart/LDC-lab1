@@ -2,11 +2,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import argparse
 
+def params_to_str(params:dict, sep:str = " - "):
+    return sep.join(f"{k}: {v}" for k,v in params.items())
 
 def process_generated_bits_file(filename: str) -> np.ndarray:
     with open(filename, 'r') as file:
         bits = [int(float(line.split(sep=' ')[0].strip())) for line in file.readlines()]
-    return np.array(bits)
+    return np.array(bits+bits)
 
 def process_osc_measurement_file(filename: str) -> tuple[np.ndarray, np.ndarray]:
     measurement = np.loadtxt(filename, dtype=float, delimiter=' ', skiprows=1)
@@ -29,8 +31,9 @@ def get_dead_zone_range(time: np.ndarray, v: np.ndarray, dead_zone_min_length: f
             return i, j
     return np.nan, np.nan
 
-def get_bit_and_error_count(t, v, mbps, bits, threshold=None, plot=True):
+def get_bit_and_error_count(t, v, mbps, bits, threshold=None, plot=True, params={}, figfilename=""):
     def get_bit_and_error_count_onesided(v, bits, threshold, dz_end, step):
+        sample_points = [dz_end + int((0.5+i)*step) for i, _ in enumerate(bits)]
         sample_points = [dz_end + int((0.5+i)*step) for i, _ in enumerate(bits)]
 
         # despues de la zona muerta
@@ -85,6 +88,18 @@ def get_bit_and_error_count(t, v, mbps, bits, threshold=None, plot=True):
         # plot erroneous sample points
         plt.scatter(t[error_sample_points], v[error_sample_points], color='r', label="Bit errors", zorder=101)
 
+        plt.title(params_to_str(params), fontsize=8)
+        lgd = plt.legend(bbox_to_anchor=(1.1, 0.5), loc='center left')
+        plt.tight_layout()
+        plt.tick_params(axis='x', rotation=45)
+        plt.xlabel("t[s]")
+        plt.ylabel("V[V]")
+        if figfilename:
+            plt.savefig(f"figs/{figfilename}.png", bbox_extra_artists=(lgd,), bbox_inches='tight')
+            xlim = plt.xlim()
+            plt.xlim((0.01528, 0.01530))
+            plt.savefig(f"figs/{figfilename}_detail.png", bbox_extra_artists=(lgd,), bbox_inches='tight')
+            plt.xlim(xlim)
     return len(error_sample_points), len(bits_after_dz) + len(bits_before_dz)
 
 
@@ -122,6 +137,7 @@ if __name__ == '__main__':
         print(f"Processing {file}...")
         bits = process_generated_bits_file(bitfile)
         t, v = process_osc_measurement_file(file)
-        error_count, bit_count = get_bit_and_error_count(t, v, mbps, bits)
+        params = {"Filename": file}
+        error_count, bit_count = get_bit_and_error_count(t, v, mbps, bits, plot=True, params=params, figfilename=file)
         print(f"BER: {error_count}/{bit_count} = {error_count/bit_count}")
     plt.show()
