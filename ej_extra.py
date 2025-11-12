@@ -88,6 +88,9 @@ def get_signal_power(v, t):
     return power
 
 def plot_signal(v, t, sp_0_read_0, sp_0_read_1, sp_1_read_1, sp_1_read_0, bits, dz_start, dz_end, filename=None):
+    
+    bits = np.trim_zeros(bits, 'fb')
+    
     plt.figure()
     
     # plots real bits:
@@ -201,7 +204,7 @@ if __name__ == '__main__':
 
         # Calculate power:
         power = get_signal_power(v, t)
-        log.append(f"Electric power (W): {power}")
+        log.append(f"Electric power (W): {power}V²/R")
 
     with open(logfile, 'a') as f:
         for line in log:
