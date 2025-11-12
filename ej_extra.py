@@ -85,7 +85,7 @@ def get_bit_and_error_count(t, v, mbps, bits, threshold=None):
     # plot erroneous sample points
     plt.scatter(t[error_sample_points], v[error_sample_points], color='r', label="Bit errors", zorder=101)
 
-    return len(error_sample_points)
+    return len(error_sample_points), len(bits_after_dz) + len(bits_before_dz)
 
 
 if __name__ == '__main__':
@@ -119,10 +119,9 @@ if __name__ == '__main__':
     print(f"Comparing measurements with following bits: {args.bitfile}")
 
     for file in files:
-        plt.figure()
+        print(f"Processing {file}...")
         bits = process_generated_bits_file(bitfile)
         t, v = process_osc_measurement_file(file)
-        error_count = get_bit_and_error_count(t, v, mbps, bits)
-
-        print(error_count)
-        plt.show()
+        error_count, bit_count = get_bit_and_error_count(t, v, mbps, bits)
+        print(f"BER: {error_count}/{bit_count} = {error_count/bit_count}")
+    plt.show()
